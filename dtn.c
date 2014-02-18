@@ -69,7 +69,7 @@ dtn_queue_spray(void *ptr)
   struct packetqueue_item *q_item = packetqueue_first(c->q);
   while (q_item) {
     if (q_item->ptr != DTN_READY) {
-      PRINTF("dtn_queue_spray: packet still pending, skip.");
+      PRINTF("dtn_queue_spray: packet still pending, skip.\n");
       q_item = q_item->next;
       continue;
     }
@@ -188,7 +188,7 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
     if (q_item->ptr != DTN_READY) {
-      PRINTF("dtn_request_recv: Request in the queue, but still pending, do nothing.");
+      PRINTF("dtn_request_recv: Request in the queue, but still pending, do nothing.\n");
       return;
     }
     PRINTF("dtn_request_recv: Request found in the queue.\n");
@@ -211,7 +211,7 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
     struct dtn_hdr *bufdata = dtn_buf_ptr();
     bufdata->num_copies /= 2;
     if (c->handoff_qb != NULL) {
-      PRINTF("dtn_request_recv: Another HandOff in progress, failed.");
+      PRINTF("dtn_request_recv: Another HandOff in progress, failed.\n");
       return;
     }
     c->handoff_qb = (struct dtn_hdr *)
@@ -236,10 +236,6 @@ dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqn
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
-    if (q_item->ptr != DTN_READY) {
-      PRINTF("dtn_handoff_recv: HandOff in the queue, but still pending, do nothing.");
-      return;
-    }
     PRINTF("dtn_handoff_recv: HandOff found in the queue.\n");
     struct dtn_hdr *qbufdata = (struct dtn_hdr *)
                                queuebuf_dataptr(packetqueue_queuebuf(q_item));
@@ -248,6 +244,8 @@ dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqn
     if (qbufdata->num_copies > DTN_L_COPIES) {
       qbufdata->num_copies = DTN_L_COPIES;
     }
+    q_item->ptr = DTN_READY;
+    PRINTF("dtn_handoff_recv: packet state set to ready.\n");
     PRINTF("dtn_handoff_recv: HandOff(L=%d) received and processed.\n", bufdata->num_copies);
     dtn_queue_spray((void *)c);
   } else {

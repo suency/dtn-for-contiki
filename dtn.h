@@ -100,9 +100,13 @@ void dtn_close(struct dtn_conn *c);
  *     send over.
  * \param to
  *     Pointer to the Rime address of message destination.
+ * \retval
+ *     Non-Zero if successfully sent
+ * \retval
+ *     Zero if failed.
  * \sa dtn_open, dtn_close
  */
-void dtn_send(struct dtn_conn *c, const rimeaddr_t *to);
+int dtn_send(struct dtn_conn *c, const rimeaddr_t *to);
 
 /**
  * Change the radio power level.

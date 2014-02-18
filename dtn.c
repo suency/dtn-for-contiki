@@ -330,7 +330,7 @@ dtn_close(struct dtn_conn *c)
   IMPT("dtn_close: DTN closed.");
 }
 /*---------------------------------------------------------------------------*/
-void
+int
 dtn_send(struct dtn_conn *c, const rimeaddr_t *to)
 {
   struct dtn_hdr hdr;
@@ -350,8 +350,10 @@ dtn_send(struct dtn_conn *c, const rimeaddr_t *to)
                                     DTN_READY)) {
     INFO("dtn_send: Enqueued successfully.\n");
     dtn_queue_spray((void *)c);
+    return 1;
   } else {
     IMPT("dtn_send: Failed to enqueue.\n");
+    return 0;
   }
 }
 /*---------------------------------------------------------------------------*/

@@ -32,7 +32,7 @@
 #define DTN_HANDOFF_NUM_HISTORY_ENTRIES 4
 
 #define DTN_POWER_MAX 0x12
-#define DTN_POWER_MIN 0x01
+#define DTN_POWER_MIN 0x00
 
 struct dtn_conn;
 struct dtn_hdr;

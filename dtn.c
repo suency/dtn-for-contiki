@@ -338,6 +338,11 @@ dtn_close(struct dtn_conn *c)
 int
 dtn_send(struct dtn_conn *c, const rimeaddr_t *to)
 {
+  if (rimeaddr_cmp(to, &rimeaddr_node_addr)) { // to me
+    IMPT("dtn_send: send to myself, invoking callback.\n");
+    c->cb->recv(c, to, c->seqno++);
+    return 1;
+  }
   struct dtn_hdr hdr;
   hdr.version = DTN_VERSION;
   hdr.magic[0] = 'S';

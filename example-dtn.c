@@ -59,8 +59,11 @@ PROCESS_THREAD(main_process, ev, data)
       sprintf(msg, "YiweiChen-%d", count);
       printf("[DTN] Sending DTN message: %s\n", msg);
       packetbuf_copyfrom(msg, strlen(msg) + 1);
-      dtn_send(&conn, &dest_addr);
-      FLASH_LED(LEDS_GREEN);
+      if (dtn_send(&conn, &dest_addr)) {
+        FLASH_LED(LEDS_GREEN);
+      } else {
+        printf("[DTN] Failed sending.\n");
+      }
     } else if (ev == sensors_event && data == &button2_sensor) {
       dest_addr.u8[0]++;
       if (dest_addr.u8[0] > 20) dest_addr.u8[0] = 0;

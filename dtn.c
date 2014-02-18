@@ -23,6 +23,9 @@
 #define PRINTADDR(addr)
 #endif
 
+#define DTN_PENDING (void*)(0)
+#define DTN_READY (void*)(1)
+
 struct dtn_hdr * dtn_buf_ptr(void);
 
 /*-MESSAGE QUEUE-------------------------------------------------------------*/
@@ -65,6 +68,11 @@ dtn_queue_spray(void *ptr)
   }
   struct packetqueue_item *q_item = packetqueue_first(c->q);
   while (q_item) {
+    if (q_item->ptr != DTN_READY) {
+      PRINTF("dtn_queue_spray: packet still pending, skip.");
+      q_item = q_item->next;
+      continue;
+    }
     struct dtn_hdr *qbufdata = (struct dtn_hdr *)
                                queuebuf_dataptr(packetqueue_queuebuf(q_item));
     if (qbufdata == NULL) {
@@ -132,8 +140,14 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)b_c - offsetof(struct dtn_conn, spray_c));
   print_packetbuf("dtn_spray_recv");
-  if (dtn_queue_find(c)) {
-    PRINTF("dtn_spray_recv: Spray alreay in the queue, do nothing.\n");
+  struct packetqueue_item * item;
+  if (item = dtn_queue_find(c)) {
+    if (item->ptr == DTN_READY) {
+      PRINTF("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
+    } else {
+      unicast_send(&c->request_c, from);
+      PRINTF("dtn_spray_recv: Spray in the queue but pending, unicast Request sent.\n");
+    }
     return;
   }
   struct dtn_hdr *bufdata = dtn_buf_ptr();
@@ -151,8 +165,8 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   bufdata->num_copies = 0;
   if (packetqueue_enqueue_packetbuf(c->q,
                                     DTN_MAX_LIFETIME * CLOCK_SECOND,
-                                    c)) {
-    PRINTF("dtn_spray_recv: Enqueued successfully.\n");
+                                    DTN_PENDING)) {
+    PRINTF("dtn_spray_recv: Enqueued (pending) successfully.\n");
     unicast_send(&c->request_c, from);
     PRINTF("dtn_spray_recv: unicast Request sent.\n");
   } else {
@@ -173,6 +187,10 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   print_packetbuf("dtn_request_recv");
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
+    if (q_item->ptr != DTN_READY) {
+      PRINTF("dtn_request_recv: Request in the queue, but still pending, do nothing.");
+      return;
+    }
     PRINTF("dtn_request_recv: Request found in the queue.\n");
     struct dtn_hdr *qbufdata = queuebuf_dataptr(packetqueue_queuebuf(q_item));
     if (rimeaddr_cmp(&(qbufdata->ereceiver), from)) {
@@ -218,6 +236,10 @@ dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqn
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
+    if (q_item->ptr != DTN_READY) {
+      PRINTF("dtn_handoff_recv: HandOff in the queue, but still pending, do nothing.");
+      return;
+    }
     PRINTF("dtn_handoff_recv: HandOff found in the queue.\n");
     struct dtn_hdr *qbufdata = (struct dtn_hdr *)
                                queuebuf_dataptr(packetqueue_queuebuf(q_item));
@@ -310,7 +332,7 @@ dtn_send(struct dtn_conn *c, const rimeaddr_t *to)
   print_packetbuf("dtn_send");
   if (packetqueue_enqueue_packetbuf(c->q,
                                     DTN_MAX_LIFETIME * CLOCK_SECOND,
-                                    c)) {
+                                    DTN_READY)) { //Hand-offed
     PRINTF("dtn_send: Enqueued successfully.\n");
     dtn_queue_spray((void *)c);
   } else {

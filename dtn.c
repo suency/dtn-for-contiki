@@ -74,34 +74,29 @@ dtn_queue_spray(void *ptr)
 {
   struct dtn_conn *c = (struct dtn_conn *)ptr;
   IMPT("dtn_queue_spray: Spraying, queue length: %d\n", packetqueue_len(c->q));
+  
   if (packetqueue_len(c->q) <= 0) {
     IMPT("dtn_queue_spray: Empty packetqueue, nothing to spray, stopped.\n");
     return;
   }
-  struct packetqueue_item *q_item = packetqueue_first(c->q);
-  while (q_item) {
+  
+  struct packetqueue_item *q_item;
+  for (q_item = packetqueue_first(c->q); q_item; q_item = q_item->next) {
     if (q_item->ptr != DTN_READY) {
       INFO("dtn_queue_spray: packet still pending, skip.\n");
-      q_item = q_item->next;
       continue;
     }
     struct dtn_hdr *qbufdata = (struct dtn_hdr *)
                                queuebuf_dataptr(packetqueue_queuebuf(q_item));
-    if (qbufdata == NULL) {
-      q_item = q_item->next;
-      continue;
-    }
-    if (qbufdata->num_copies == 0) {
-      q_item = q_item->next;
-      continue;
-    }
+    if (qbufdata == NULL) continue;
+    if (qbufdata->num_copies == 0) continue;
     packetbuf_clear();
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     print_packetbuf("dtn_queue_spray");
     broadcast_send(&c->spray_c);
     INFO("dtn_queue_spray: broadcast Spray sent.\n");
-    q_item = q_item->next;
   }
+  
   INFO("dtn_queue_spray: Paused spraying.\n");
   if (ctimer_expired(&c->spray_ct)){
     ctimer_set(&c->spray_ct,
@@ -115,16 +110,15 @@ struct packetqueue_item *
 dtn_queue_find(struct dtn_conn *c)
 {
   struct dtn_hdr *bufdata = dtn_buf_ptr();
-  struct packetqueue_item *q_item = packetqueue_first(c->q);
-  while (q_item) {
+  struct packetqueue_item *q_item;
+  for (q_item = packetqueue_first(c->q); q_item; q_item = q_item->next) {
     struct dtn_hdr *qbufdata = (struct dtn_hdr *)
                                queuebuf_dataptr(packetqueue_queuebuf(q_item));
-    if (qbufdata == NULL) return NULL;
+    if (qbufdata == NULL) continue;
     if (rimeaddr_cmp(&(bufdata->esender), &(qbufdata->esender))
         && bufdata->epacketid == qbufdata->epacketid) {
       return q_item;
     }
-    q_item = q_item->next;
   }
   return NULL;
 }
@@ -134,8 +128,8 @@ dtn_valid_hdr()
 {
   struct dtn_hdr *bufdata = dtn_buf_ptr();
   if (bufdata->version == DTN_VERSION
-          && bufdata->magic[0] == 'S'
-          && bufdata->magic[1] == 'W') {
+      && bufdata->magic[0] == 'S'
+      && bufdata->magic[1] == 'W') {
     return 1;
   } else {
     print_packetbuf("dtn_valid_hdr");
@@ -153,20 +147,16 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)b_c - offsetof(struct dtn_conn, spray_c));
   print_packetbuf("dtn_spray_recv");
-  struct packetqueue_item * item;
-  if (item = dtn_queue_find(c)) {
-    if (item->ptr == DTN_READY) {
-      INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
-    } else {
-      unicast_send(&c->request_c, from);
-      IMPT("dtn_spray_recv: Spray in queue but pending, Request sent.\n");
-    }
+  struct dtn_hdr *bufdata = dtn_buf_ptr();
+  struct dtn_hdr recv_hdr;
+  memcpy(&recv_hdr, bufdata, sizeof (struct dtn_hdr));
+  
+  if (rimeaddr_cmp(&(recv_hdr.esender), &rimeaddr_node_addr)) { // from me
+    INFO("dtn_spray_recv: Spray message is from me, do nothing.\n");
     return;
   }
-  struct dtn_hdr *bufdata = dtn_buf_ptr();
-  static struct dtn_hdr recv_hdr;
-  memcpy(&recv_hdr, bufdata, sizeof (struct dtn_hdr));
-  if (rimeaddr_cmp(&(bufdata->ereceiver), &rimeaddr_node_addr)) { //for me
+  
+  if (rimeaddr_cmp(&(recv_hdr.ereceiver), &rimeaddr_node_addr)) { // to me
     IMPT("dtn_spray_recv: Spray message is to me, invoking callback.\n");
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request confirmation sent.\n");
@@ -174,7 +164,21 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
     c->cb->recv(c, &(recv_hdr.esender), recv_hdr.epacketid);
     return;
   }
-  if (bufdata->num_copies == 1) return; //not for me and only one copy
+  
+  if (recv_hdr.num_copies == 1) return; // not to me and only one copy
+  
+  struct packetqueue_item * item;
+  if (item = dtn_queue_find(c)) { // found in the queue
+    if (item->ptr == DTN_READY) {
+      INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
+    } else { // still pending
+      unicast_send(&c->request_c, from);
+      IMPT("dtn_spray_recv: Spray in queue but pending, Request sent.\n");
+    }
+    return;
+  }
+  
+  // not in the queue
   bufdata->num_copies = 0;
   if (packetqueue_enqueue_packetbuf(c->q,
                                     DTN_MAX_LIFETIME * CLOCK_SECOND,
@@ -198,44 +202,46 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)u_c - offsetof(struct dtn_conn, request_c));
   print_packetbuf("dtn_request_recv");
+  
   struct packetqueue_item * q_item;
-  if (q_item = dtn_queue_find(c)) {
-    if (q_item->ptr != DTN_READY) {
-      IMPT("dtn_request_recv: Request in queue, but pending, do nothing.\n");
-      return;
-    }
-    INFO("dtn_request_recv: Request found in the queue.\n");
-    struct dtn_hdr *qbufdata = queuebuf_dataptr(packetqueue_queuebuf(q_item));
-    if (rimeaddr_cmp(&(qbufdata->ereceiver), from)) {
-      qbufdata->num_copies = 0;
-      IMPT("dtn_request_recv: receiver got message, set L to 0.\n");
-      return;
-    }
-    if ((qbufdata->num_copies == 1)
-        && !rimeaddr_cmp(from, &(qbufdata->ereceiver))) {
-      IMPT("dtn_request_recv: L == 1, and from != ereceiver, do nothing.\n");
-      return;
-    }
-    if (qbufdata->num_copies == 0) {
-      IMPT("dtn_request_recv: L == 0, do nothing.\n");
-      return;
-    }
-    queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
-    struct dtn_hdr *bufdata = dtn_buf_ptr();
-    bufdata->num_copies /= 2;
-    if (c->handoff_qb != NULL) {
-      IMPT("dtn_request_recv: Another HandOff in progress, failed.\n");
-      return;
-    }
-    c->handoff_qb = (struct dtn_hdr *)
-                    queuebuf_dataptr(packetqueue_queuebuf(q_item));
-    memcpy(&(c->handoff_hdr), c->handoff_qb, sizeof(struct dtn_hdr));
-    runicast_send(&c->handoff_c, from, DTN_RTX);
-    IMPT("dtn_request_recv: runicast HandOff(L=%d) sent.\n",
-         bufdata->num_copies);
-  } else {
+  if (!(q_item = dtn_queue_find(c))) {
     IMPT("dtn_request_recv: Request not in the queue, do nothing.\n");
+    return;
   }
+  if (q_item->ptr != DTN_READY) {
+    IMPT("dtn_request_recv: Request in queue, but pending, do nothing.\n");
+    return;
+  }
+  INFO("dtn_request_recv: Request found in the queue.\n");
+  struct dtn_hdr *qbufdata = (struct dtn_hdr *)
+                             queuebuf_dataptr(packetqueue_queuebuf(q_item));
+  if (rimeaddr_cmp(&(qbufdata->ereceiver), from)) {
+    qbufdata->num_copies = 0;
+    IMPT("dtn_request_recv: receiver got message, set L to 0.\n");
+    return;
+  }
+  if ((qbufdata->num_copies == 1)
+      && !rimeaddr_cmp(from, &(qbufdata->ereceiver))) {
+    IMPT("dtn_request_recv: L == 1, and from != ereceiver, do nothing.\n");
+    return;
+  }
+  if (qbufdata->num_copies == 0) {
+    IMPT("dtn_request_recv: L == 0, do nothing.\n");
+    return;
+  }
+  if (c->handoff_qb != NULL) {
+    IMPT("dtn_request_recv: Another HandOff in progress, do nothing.\n");
+    return;
+  }
+  c->handoff_qb = (struct dtn_hdr *)
+                  queuebuf_dataptr(packetqueue_queuebuf(q_item));
+  memcpy(&(c->handoff_hdr), c->handoff_qb, sizeof(struct dtn_hdr));
+  queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
+  struct dtn_hdr *bufdata = dtn_buf_ptr();
+  bufdata->num_copies /= 2;
+  runicast_send(&c->handoff_c, from, DTN_RTX);
+  IMPT("dtn_request_recv: runicast HandOff(L=%d) sending.\n",
+       bufdata->num_copies);
 }
 /*---------------------------------------------------------------------------*/
 const struct unicast_callbacks dtn_request_call = {dtn_request_recv};
@@ -250,23 +256,23 @@ dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from,
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   struct packetqueue_item * q_item;
-  if (q_item = dtn_queue_find(c)) {
-    INFO("dtn_handoff_recv: HandOff found in the queue.\n");
-    struct dtn_hdr *qbufdata = (struct dtn_hdr *)
-                               queuebuf_dataptr(packetqueue_queuebuf(q_item));
-    struct dtn_hdr *bufdata = dtn_buf_ptr();
-    qbufdata->num_copies += bufdata->num_copies;
-    if (qbufdata->num_copies > DTN_L_COPIES) {
-      qbufdata->num_copies = DTN_L_COPIES;
-    }
-    q_item->ptr = DTN_READY;
-    INFO("dtn_handoff_recv: packet state set to ready.\n");
-    IMPT("dtn_handoff_recv: HandOff(L=%d) received and processed.\n",
-         bufdata->num_copies);
-    dtn_queue_spray((void *)c);
-  } else {
+  if (!(q_item = dtn_queue_find(c))) { // not found in the queue
     IMPT("dtn_handoff_recv: HandOff not in the queue, do nothing.\n");
+    return;
   }
+  INFO("dtn_handoff_recv: HandOff found in the queue.\n");
+  struct dtn_hdr *qbufdata = (struct dtn_hdr *)
+                             queuebuf_dataptr(packetqueue_queuebuf(q_item));
+  struct dtn_hdr *bufdata = dtn_buf_ptr();
+  qbufdata->num_copies += bufdata->num_copies;
+  if (qbufdata->num_copies > DTN_L_COPIES) {
+    qbufdata->num_copies = DTN_L_COPIES;
+  }
+  q_item->ptr = DTN_READY;
+  INFO("dtn_handoff_recv: packet state set to ready.\n");
+  IMPT("dtn_handoff_recv: HandOff(L=%d) received and processed.\n",
+       bufdata->num_copies);
+  dtn_queue_spray((void *)c);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -279,8 +285,7 @@ dtn_handoff_sent(struct runicast_conn *r_c, const rimeaddr_t *to,
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   if (rimeaddr_cmp(&(c->handoff_qb->esender), &(c->handoff_hdr.esender))
       && c->handoff_qb->epacketid == c->handoff_hdr.epacketid) {
-    static int sent_copies;
-    sent_copies = c->handoff_qb->num_copies / 2;
+    int sent_copies = c->handoff_qb->num_copies / 2;
     c->handoff_qb->num_copies = c->handoff_qb->num_copies - sent_copies;
     IMPT("dtn_handoff_sent: HandOff(L=%d) processed.\n", sent_copies);
   } else {

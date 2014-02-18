@@ -159,7 +159,8 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
       INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
     } else {
       unicast_send(&c->request_c, from);
-      IMPT("dtn_spray_recv: Spray in the queue but pending, unicast Request sent.\n");
+      IMPT("dtn_spray_recv: Spray in the queue but pending, \
+           unicast Request sent.\n");
     }
     return;
   }
@@ -201,7 +202,8 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
     if (q_item->ptr != DTN_READY) {
-      IMPT("dtn_request_recv: Request in the queue, but still pending, do nothing.\n");
+      IMPT("dtn_request_recv: Request in the queue, but still pending, \
+           do nothing.\n");
       return;
     }
     INFO("dtn_request_recv: Request found in the queue.\n");
@@ -231,7 +233,8 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
                     queuebuf_dataptr(packetqueue_queuebuf(q_item));
     memcpy(&(c->handoff_hdr), c->handoff_qb, sizeof(struct dtn_hdr));
     runicast_send(&c->handoff_c, from, DTN_RTX);
-    IMPT("dtn_request_recv: runicast HandOff(L=%d) sent.\n", bufdata->num_copies);
+    IMPT("dtn_request_recv: runicast HandOff(L=%d) sent.\n",
+         bufdata->num_copies);
   } else {
     IMPT("dtn_request_recv: Request not in the queue, do nothing.\n");
   }
@@ -240,7 +243,8 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
 const struct unicast_callbacks dtn_request_call = {dtn_request_recv};
 /*-HANDOFF-------------------------------------------------------------------*/
 void
-dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqno)
+dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from,
+                 uint8_t seqno)
 {
   INFO("dtn_handoff_recv: runicast received from %02x:%02x, seqno %d\n",
        from->u8[1], from->u8[0], seqno);
@@ -259,7 +263,8 @@ dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqn
     }
     q_item->ptr = DTN_READY;
     INFO("dtn_handoff_recv: packet state set to ready.\n");
-    IMPT("dtn_handoff_recv: HandOff(L=%d) received and processed.\n", bufdata->num_copies);
+    IMPT("dtn_handoff_recv: HandOff(L=%d) received and processed.\n",
+         bufdata->num_copies);
     dtn_queue_spray((void *)c);
   } else {
     IMPT("dtn_handoff_recv: HandOff not in the queue, do nothing.\n");
@@ -281,7 +286,8 @@ dtn_handoff_sent(struct runicast_conn *r_c, const rimeaddr_t *to,
     c->handoff_qb->num_copies = c->handoff_qb->num_copies - sent_copies;
     IMPT("dtn_handoff_sent: HandOff(L=%d) processed.\n", sent_copies);
   } else {
-    IMPT("dtn_handoff_sent: queuebuf not matched (expired), HandOff not processed.\n");
+    IMPT("dtn_handoff_sent: queuebuf not matched (expired), \
+         HandOff not processed.\n");
   }
   c->handoff_qb = NULL;
 }

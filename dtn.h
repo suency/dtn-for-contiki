@@ -74,19 +74,21 @@ struct dtn_conn {
  *     Pointer to a struct \ref dtn_conn representing the \ref dtn "DTN"
  *     connection to open.
  * \param dtn_channel
- *     Channel number to use for the spray phase in the \ref dtn "DTN" connection.
- *     Note that its following two channels will also be used for the request and
- *     hand-off phases.
+ *     Channel number to use for the spray phase in the \ref dtn "DTN"
+ *     connection. Note that its following two channels will also be used for
+ *     the request and hand-off phases.
  * \param cb
  *     Pointer to a struct \ref dtn_callbacks.
  * \sa dtn_close, dtn_send
  */
-void dtn_open(struct dtn_conn *c, uint16_t dtn_channel, const struct dtn_callbacks *cb);
+void dtn_open(struct dtn_conn *c, uint16_t dtn_channel,
+              const struct dtn_callbacks *cb);
 
 /**
  * Close a DTN connection
  * \param c
- *     Pointer to a struct \ref dtn_conn representing the DTN connection to close.
+ *     Pointer to a struct \ref dtn_conn representing the DTN connection to
+ *     close.
  * \sa dtn_open, dtn_send
  */
 void dtn_close(struct dtn_conn *c);
@@ -94,7 +96,8 @@ void dtn_close(struct dtn_conn *c);
 /**
  * Send the data in the packet buffer over a DTN connection.
  * \param c
- *     Pointer to a struct \ref dtn_conn representing the DTN connection to send over.
+ *     Pointer to a struct \ref dtn_conn representing the DTN connection to
+ *     send over.
  * \param to
  *     Pointer to the Rime address of message destination.
  * \sa dtn_open, dtn_close

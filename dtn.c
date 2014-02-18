@@ -159,8 +159,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
       INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
     } else {
       unicast_send(&c->request_c, from);
-      IMPT("dtn_spray_recv: Spray in the queue but pending, \
-           unicast Request sent.\n");
+      IMPT("dtn_spray_recv: Spray in queue but pending, Request sent.\n");
     }
     return;
   }
@@ -202,8 +201,7 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct packetqueue_item * q_item;
   if (q_item = dtn_queue_find(c)) {
     if (q_item->ptr != DTN_READY) {
-      IMPT("dtn_request_recv: Request in the queue, but still pending, \
-           do nothing.\n");
+      IMPT("dtn_request_recv: Request in queue, but pending, do nothing.\n");
       return;
     }
     INFO("dtn_request_recv: Request found in the queue.\n");
@@ -286,8 +284,7 @@ dtn_handoff_sent(struct runicast_conn *r_c, const rimeaddr_t *to,
     c->handoff_qb->num_copies = c->handoff_qb->num_copies - sent_copies;
     IMPT("dtn_handoff_sent: HandOff(L=%d) processed.\n", sent_copies);
   } else {
-    IMPT("dtn_handoff_sent: queuebuf not matched (expired), \
-         HandOff not processed.\n");
+    IMPT("dtn_handoff_sent: not matched (expired), HandOff not processed.\n");
   }
   c->handoff_qb = NULL;
 }

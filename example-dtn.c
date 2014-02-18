@@ -16,7 +16,7 @@
 
 #define FLASH_LED(l) {leds_on(l); clock_delay_msec(50); leds_off(l); clock_delay_msec(50);}
 
-#define DTN_CHANNEL 131
+#define DTN_CHANNEL 128
 
 void
 dtn_recv(struct dtn_conn *c, const rimeaddr_t *from, uint16_t packetid)

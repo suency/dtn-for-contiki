@@ -185,6 +185,10 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
       PRINTF("dtn_request_recv: L == 1, and from != ereceiver, do nothing.\n");
       return;
     }
+    if (qbufdata->num_copies == 0) {
+      PRINTF("dtn_request_recv: L == 0, do nothing.\n");
+      return;
+    }
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     struct dtn_hdr *bufdata = dtn_buf_ptr();
     bufdata->num_copies /= 2;

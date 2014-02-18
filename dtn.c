@@ -95,6 +95,7 @@ dtn_queue_spray(void *ptr)
       q_item = q_item->next;
       continue;
     }
+    packetbuf_clear();
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     print_packetbuf("dtn_queue_spray");
     broadcast_send(&c->spray_c);
@@ -147,7 +148,7 @@ void
 dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
 {
   INFO("dtn_spray_recv: broadcast received from %02x:%02x.\n",
-         from->u8[1], from->u8[0]);
+       from->u8[1], from->u8[0]);
   if (!dtn_valid_hdr()) return;
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)b_c - offsetof(struct dtn_conn, spray_c));
@@ -163,12 +164,12 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
     return;
   }
   struct dtn_hdr *bufdata = dtn_buf_ptr();
+  static struct dtn_hdr recv_hdr;
+  memcpy(&recv_hdr, bufdata, sizeof (struct dtn_hdr));
   if (rimeaddr_cmp(&(bufdata->ereceiver), &rimeaddr_node_addr)) { //for me
     IMPT("dtn_spray_recv: Spray message is to me, invoking callback.\n");
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request confirmation sent.\n");
-    static struct dtn_hdr recv_hdr;
-    memcpy(&recv_hdr, bufdata, sizeof (struct dtn_hdr));
     packetbuf_hdrreduce(sizeof(struct dtn_hdr));
     c->cb->recv(c, &(recv_hdr.esender), recv_hdr.epacketid);
     return;
@@ -192,7 +193,7 @@ void
 dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
 {
   INFO("dtn_request_recv: unicast received from %02x:%02x\n",
-         from->u8[1], from->u8[0]);
+       from->u8[1], from->u8[0]);
   if (!dtn_valid_hdr()) return;
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)u_c - offsetof(struct dtn_conn, request_c));
@@ -242,7 +243,7 @@ void
 dtn_handoff_recv(struct runicast_conn *r_c, const rimeaddr_t *from, uint8_t seqno)
 {
   INFO("dtn_handoff_recv: runicast received from %02x:%02x, seqno %d\n",
-         from->u8[1], from->u8[0], seqno);
+       from->u8[1], from->u8[0], seqno);
   if (!dtn_valid_hdr()) return;
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
@@ -270,7 +271,7 @@ dtn_handoff_sent(struct runicast_conn *r_c, const rimeaddr_t *to,
                  uint8_t retransmissions)
 {
   INFO("dtn_handoff_sent: runicast sent to %02x:%02x, retried %d\n",
-         to->u8[1], to->u8[0], retransmissions);
+       to->u8[1], to->u8[0], retransmissions);
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   if (rimeaddr_cmp(&(c->handoff_qb->esender), &(c->handoff_hdr.esender))
@@ -290,7 +291,7 @@ dtn_handoff_timedout(struct runicast_conn *r_c, const rimeaddr_t *to,
                      uint8_t retransmissions)
 {
   IMPT("dtn_handoff_timedout: runicast timed out, to %02x:%02x, retried %d\n",
-         to->u8[1], to->u8[0], retransmissions);
+       to->u8[1], to->u8[0], retransmissions);
   struct dtn_conn *c = (struct dtn_conn *)
                        ((void *)r_c - offsetof(struct dtn_conn, handoff_c));
   c->handoff_qb = NULL;
@@ -314,7 +315,7 @@ dtn_open(struct dtn_conn *c, uint16_t dtn_channel,
   unicast_open(&c->request_c, dtn_channel + 1, &dtn_request_call);
   runicast_open(&c->handoff_c, dtn_channel + 2, &dtn_handoff_call);
   IMPT("dtn_open: DTN connection opened at channel (%d, %d, %d).\n",
-         dtn_channel, dtn_channel + 1, dtn_channel + 2);
+       dtn_channel, dtn_channel + 1, dtn_channel + 2);
 }
 /*---------------------------------------------------------------------------*/
 void
@@ -343,7 +344,7 @@ dtn_send(struct dtn_conn *c, const rimeaddr_t *to)
   print_packetbuf("dtn_send");
   if (packetqueue_enqueue_packetbuf(c->q,
                                     DTN_MAX_LIFETIME * CLOCK_SECOND,
-                                    DTN_READY)) { //Hand-offed
+                                    DTN_READY)) {
     INFO("dtn_send: Enqueued successfully.\n");
     dtn_queue_spray((void *)c);
   } else {

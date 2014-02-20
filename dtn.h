@@ -123,7 +123,5 @@ void dtn_set_power(uint8_t power);
 void dtn_set_addr(rimeaddr_t *addr);
 
 #endif
-/**
- * }@
- */
+/** }@ */
 

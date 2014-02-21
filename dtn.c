@@ -61,7 +61,7 @@ print_packetbuf(char * func)
 }
 /*-LOCAL FUNCTIONS-----------------------------------------------------------*/
 void
-dtn_backoff(void)
+dtn_delay(void)
 {
   clock_delay_usec(random_rand() % 10000 + 10000);
 }
@@ -99,7 +99,7 @@ dtn_queue_spray(void *ptr)
     packetbuf_clear();
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     print_packetbuf("dtn_queue_spray");
-    dtn_backoff();
+    dtn_delay();
     broadcast_send(&c->spray_c);
     INFO("dtn_queue_spray: broadcast Spray sent.\n");
   }
@@ -164,7 +164,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   }
   
   if (rimeaddr_cmp(&(recv_hdr.ereceiver), &rimeaddr_node_addr)) { // to me
-    dtn_backoff();
+    dtn_delay();
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request confirmation sent.\n");
     IMPT("dtn_spray_recv: Spray message is to me, invoking callback.\n");
@@ -180,7 +180,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
     if (item->ptr == DTN_READY) {
       INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
     } else { // still pending
-      dtn_backoff();
+      dtn_delay();
       unicast_send(&c->request_c, from);
       IMPT("dtn_spray_recv: Spray in queue but pending, Request sent to ");
       IMPTADDR(from);
@@ -195,7 +195,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
                                     DTN_MAX_LIFETIME * CLOCK_SECOND,
                                     DTN_PENDING)) {
     INFO("dtn_spray_recv: Enqueued (pending) successfully.\n");
-    dtn_backoff();
+    dtn_delay();
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request sent to ");
     IMPTADDR(from);
@@ -253,7 +253,7 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
   struct dtn_hdr *bufdata = dtn_buf_ptr();
   bufdata->num_copies /= 2;
-  dtn_backoff();
+  dtn_delay();
   runicast_send(&c->handoff_c, from, DTN_RTX);
   IMPT("dtn_request_recv: runicast HandOff(L=%d) sending.\n",
        bufdata->num_copies);

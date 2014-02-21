@@ -7,10 +7,10 @@
  * \defgroup dtn Delay-Tolerant Networking
  * 
  * DTN implementation for Contiki
- *
- * \example example-dtn.c
  * 
  * @{
+ * \example example-dtn.c
+ * 
  * \section channels Channels
  *     The DTN module uses 3 channels (for spray, request and hand-off).
  * 

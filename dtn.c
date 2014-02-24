@@ -13,11 +13,8 @@
 #include <stddef.h>
 #include "net/rime.h"
 
-/* 0 - Nothing
- * 1 - Important only
- * 2 - ALL
- */
-#define DTN_DEBUG_LEVEL 2
+#define DTN_CSVLOG 1      /**< 0 - Off, 1 - On */
+#define DTN_DEBUG_LEVEL 0 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
 
 #if DTN_DEBUG_LEVEL >= 2
 #define INFO(...) printf(__VA_ARGS__)
@@ -36,16 +33,23 @@
 #define IMPTADDR(addr)
 #endif
 
+#if DTN_CSVLOG
+#define CSVLOG_PACKBUF(func) csvlog_packetbuf(func)
+#else
+#define CSVLOG_PACKBUF(func)
+#endif
+
 #define DTN_PENDING (void*)(0)
 #define DTN_READY (void*)(1)
 
 struct dtn_hdr * dtn_buf_ptr(void);
+int dtn_valid_hdr(void);
 
 /*-MESSAGE QUEUE-------------------------------------------------------------*/
 PACKETQUEUE(dtn_packetqueue, DTN_QUEUE_MAX);
 /*-DEBUG FUNCTIONS-----------------------------------------------------------*/
 void
-print_packetbuf(char * func)
+print_packetbuf(char *func)
 {
   INFO("%s: total length %d\n", func, packetbuf_totlen());
   struct dtn_hdr *hdrptr = dtn_buf_ptr();
@@ -58,6 +62,32 @@ print_packetbuf(char * func)
   INFO("    packetbuf_data: {len: %d, s: %s}\n",
        packetbuf_totlen() - sizeof(struct dtn_hdr),
        hdrptr + 1);
+}
+/*---------------------------------------------------------------------------*/
+void
+csvlog_packetbuf(char *func)
+{
+  struct dtn_hdr *buf;
+  rimeaddr_t *addr;
+  printf("%s, ", func);
+  addr = (rimeaddr_t *)packetbuf_addr(PACKETBUF_ADDR_SENDER);
+  printf("%02x%02x:%02x%02x, ",
+         addr->u8[3], addr->u8[2], addr->u8[1], addr->u8[0]);
+  addr = (rimeaddr_t *)packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
+  printf("%02x%02x:%02x%02x, ",
+         addr->u8[3], addr->u8[2], addr->u8[1], addr->u8[0]);
+  if (dtn_valid_hdr()) {
+    buf = dtn_buf_ptr();
+    addr = &(buf->esender);
+    printf("%02x%02x:%02x%02x, ",
+         addr->u8[3], addr->u8[2], addr->u8[1], addr->u8[0]);
+    addr = &(buf->ereceiver);
+    printf("%02x%02x:%02x%02x, ",
+         addr->u8[3], addr->u8[2], addr->u8[1], addr->u8[0]);
+    printf("%d, %d\n", buf->epacketid, buf->num_copies);
+  } else {
+    printf("X, X, X, X\n");
+  }
 }
 /*-LOCAL FUNCTIONS-----------------------------------------------------------*/
 void
@@ -100,6 +130,7 @@ dtn_queue_spray(void *ptr)
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     print_packetbuf("dtn_queue_spray");
     dtn_delay();
+    CSVLOG_PACKBUF("spray");
     broadcast_send(&c->spray_c);
     INFO("dtn_queue_spray: broadcast Spray sent.\n");
   }
@@ -165,6 +196,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   
   if (rimeaddr_cmp(&(recv_hdr.ereceiver), &rimeaddr_node_addr)) { // to me
     dtn_delay();
+    CSVLOG_PACKBUF("request");
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request confirmation sent.\n");
     IMPT("dtn_spray_recv: Spray message is to me, invoking callback.\n");
@@ -181,6 +213,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
       INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
     } else { // still pending
       dtn_delay();
+      CSVLOG_PACKBUF("request");
       unicast_send(&c->request_c, from);
       IMPT("dtn_spray_recv: Spray in queue but pending, Request sent to ");
       IMPTADDR(from);
@@ -196,6 +229,7 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
                                     DTN_PENDING)) {
     INFO("dtn_spray_recv: Enqueued (pending) successfully.\n");
     dtn_delay();
+    CSVLOG_PACKBUF("request");
     unicast_send(&c->request_c, from);
     IMPT("dtn_spray_recv: unicast Request sent to ");
     IMPTADDR(from);
@@ -254,6 +288,7 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct dtn_hdr *bufdata = dtn_buf_ptr();
   bufdata->num_copies /= 2;
   dtn_delay();
+  CSVLOG_PACKBUF("handoff");
   runicast_send(&c->handoff_c, from, DTN_RTX);
   IMPT("dtn_request_recv: runicast HandOff(L=%d) sending.\n",
        bufdata->num_copies);

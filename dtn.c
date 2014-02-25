@@ -13,8 +13,8 @@
 #include <stddef.h>
 #include "net/rime.h"
 
-#define DTN_CSVLOG 1      /**< 0 - Off, 1 - On */
-#define DTN_DEBUG_LEVEL 0 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
+#define DTN_CSVLOG 0      /**< 0 - Off, 1 - On */
+#define DTN_DEBUG_LEVEL 2 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
 
 #if DTN_DEBUG_LEVEL >= 2
 #define INFO(...) printf(__VA_ARGS__)
@@ -100,8 +100,11 @@ struct dtn_hdr *
 dtn_buf_ptr(void)
 {
   struct dtn_hdr *hdrptr;
-  if (packetbuf_hdrlen() > 0) hdrptr = (struct dtn_hdr *)packetbuf_hdrptr();
-  else (struct dtn_hdr *)packetbuf_dataptr();
+  if (packetbuf_hdrlen() == sizeof(struct dtn_hdr)) {
+    hdrptr = (struct dtn_hdr *)packetbuf_hdrptr();
+  } else {
+    hdrptr = (struct dtn_hdr *)packetbuf_dataptr();
+  }
   return hdrptr;
 }
 /*---------------------------------------------------------------------------*/
@@ -130,8 +133,8 @@ dtn_queue_spray(void *ptr)
     queuebuf_to_packetbuf(packetqueue_queuebuf(q_item));
     print_packetbuf("dtn_queue_spray");
     dtn_delay();
-    CSVLOG_PACKBUF("spray");
     broadcast_send(&c->spray_c);
+    CSVLOG_PACKBUF("spray");
     INFO("dtn_queue_spray: broadcast Spray sent.\n");
   }
   
@@ -196,8 +199,8 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
   
   if (rimeaddr_cmp(&(recv_hdr.ereceiver), &rimeaddr_node_addr)) { // to me
     dtn_delay();
-    CSVLOG_PACKBUF("request");
     unicast_send(&c->request_c, from);
+    CSVLOG_PACKBUF("request");
     IMPT("dtn_spray_recv: unicast Request confirmation sent.\n");
     IMPT("dtn_spray_recv: Spray message is to me, invoking callback.\n");
     packetbuf_hdrreduce(sizeof(struct dtn_hdr));
@@ -213,8 +216,8 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
       INFO("dtn_spray_recv: Spray in the queue and ready, do nothing.\n");
     } else { // still pending
       dtn_delay();
-      CSVLOG_PACKBUF("request");
       unicast_send(&c->request_c, from);
+      CSVLOG_PACKBUF("request");
       IMPT("dtn_spray_recv: Spray in queue but pending, Request sent to ");
       IMPTADDR(from);
       IMPT(".\n");
@@ -229,8 +232,8 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
                                     DTN_PENDING)) {
     INFO("dtn_spray_recv: Enqueued (pending) successfully.\n");
     dtn_delay();
-    CSVLOG_PACKBUF("request");
     unicast_send(&c->request_c, from);
+    CSVLOG_PACKBUF("request");
     IMPT("dtn_spray_recv: unicast Request sent to ");
     IMPTADDR(from);
     IMPT(".\n");
@@ -288,8 +291,8 @@ dtn_request_recv(struct unicast_conn *u_c, const rimeaddr_t *from)
   struct dtn_hdr *bufdata = dtn_buf_ptr();
   bufdata->num_copies /= 2;
   dtn_delay();
-  CSVLOG_PACKBUF("handoff");
   runicast_send(&c->handoff_c, from, DTN_RTX);
+  CSVLOG_PACKBUF("handoff");
   IMPT("dtn_request_recv: runicast HandOff(L=%d) sending.\n",
        bufdata->num_copies);
 }

@@ -13,8 +13,8 @@
 #include <stddef.h>
 #include "net/rime.h"
 
-#define DTN_CSVLOG 0      /**< 0 - Off, 1 - On */
-#define DTN_DEBUG_LEVEL 2 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
+#define DTN_CSVLOG 1      /**< 0 - Off, 1 - On */
+#define DTN_DEBUG_LEVEL 0 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
 
 #if DTN_DEBUG_LEVEL >= 2
 #define INFO(...) printf(__VA_ARGS__)

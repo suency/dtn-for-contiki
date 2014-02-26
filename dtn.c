@@ -13,8 +13,8 @@
 #include <stddef.h>
 #include "net/rime.h"
 
-#define DTN_CSVLOG 1      /**< 0 - Off, 1 - On */
-#define DTN_DEBUG_LEVEL 0 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
+#define DTN_CSVLOG 0      /**< 0 - Off, 1 - On */
+#define DTN_DEBUG_LEVEL 2 /**< 0 - Nothing, 1 - Important only, 2 - ALL */
 
 #if DTN_DEBUG_LEVEL >= 2
 #define INFO(...) printf(__VA_ARGS__)
@@ -51,15 +51,15 @@ PACKETQUEUE(dtn_packetqueue, DTN_QUEUE_MAX);
 void
 print_packetbuf(char *func)
 {
-  INFO("%s: total length %d\n", func, packetbuf_totlen());
+  INFO("%s: tot: %d, ", func, packetbuf_totlen());
   struct dtn_hdr *hdrptr = dtn_buf_ptr();
-  INFO("    packetbuf_hdr: {l: %d", hdrptr->num_copies);
+  INFO("hdr: {l: %d", hdrptr->num_copies);
   INFO(", es: ");
   INFOADDR(&(hdrptr->esender));
   INFO(", er: ");
   INFOADDR(&(hdrptr->ereceiver));
-  INFO(", ep: %d}\n", hdrptr->epacketid);
-  INFO("    packetbuf_data: {len: %d, s: %s}\n",
+  INFO(", ep: %d}, ", hdrptr->epacketid);
+  INFO("data: {len: %d, s: %s}\n",
        packetbuf_totlen() - sizeof(struct dtn_hdr),
        hdrptr + 1);
 }
@@ -208,7 +208,10 @@ dtn_spray_recv(struct broadcast_conn *b_c, const rimeaddr_t *from)
     return;
   }
   
-  if (recv_hdr.num_copies == 1) return; // not to me and only one copy
+  if (recv_hdr.num_copies == 1) { // not to me and only one copy
+    INFO("dtn_spray_recv: Not to me and L == 1, do nothing.\n");
+    return;
+  }
   
   struct packetqueue_item * item;
   if (item = dtn_queue_find(c)) { // found in the queue

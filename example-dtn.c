@@ -37,7 +37,7 @@ PROCESS_THREAD(main_process, ev, data)
   static char msg[100];
   static int count = 0;
   static rimeaddr_t my_addr, dest_addr;
-  static uint8_t power = DTN_POWER_MAX;
+  static uint8_t power = DTN_POWER_MIN;
   
   PROCESS_EXITHANDLER(dtn_close(&conn););
   PROCESS_BEGIN();
